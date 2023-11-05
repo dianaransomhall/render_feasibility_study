@@ -30,8 +30,9 @@ app.layout = html.Div([
 def update_results( price_per_kwh):
     # Perform your calculations here
 
-    df_by_year = pd.read_csv("/Users/dianaransomhall/Dropbox/Documents/Software/batteryze/batteryze_app/data/df_by_year_unformatted.csv")
-
+    # df_by_year = pd.read_csv("/Users/dianaransomhall/Dropbox/Documents/Software/batteryze/batteryze_app/data/df_by_year_unformatted.csv")
+    github_csv_url = "https://raw.githubusercontent.com/dianaransomhall/render_feasibility_study/main/data/df_by_year_unformatted.csv"
+    df_by_year = pd.read_csv(github_csv_url)
     def calculate_payout(df_by_year,
                          price_per_kwh=576,
                          warranty_period=1):
