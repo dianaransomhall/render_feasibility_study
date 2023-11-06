@@ -43,9 +43,9 @@ def update_results( price_per_kwh, battery_size_kwh, target_loss_ratio ):
     # Perform your calculations here
     # make target loss ratio into a percent
     target_loss_ratio=target_loss_ratio/100
-    df_by_year = pd.read_csv("/Users/dianaransomhall/Dropbox/Documents/Software/batteryze/batteryze_app/data/df_by_year_unformatted.csv")
-    # github_csv_url = "https://raw.githubusercontent.com/dianaransomhall/render_feasibility_study/main/data/df_by_year_unformatted.csv"
-    # df_by_year = pd.read_csv(github_csv_url)
+    # df_by_year = pd.read_csv("/Users/dianaransomhall/Dropbox/Documents/Software/batteryze/batteryze_app/data/df_by_year_unformatted.csv")
+    github_csv_url = "https://raw.githubusercontent.com/dianaransomhall/render_feasibility_study/main/data/df_by_year_unformatted.csv"
+    df_by_year = pd.read_csv(github_csv_url)
     def calculate_payout(df_by_year,
                          price_per_kwh=576,
                          battery_size_kwh=40,
