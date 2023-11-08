@@ -1,27 +1,29 @@
 import dash
 from dash import html, dash_table, dcc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import numpy as np
 import plotly.express as px
 import pandas as pd
+import io
+import base64
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
 server = app.server
-# Define the app layout
-data = pd.DataFrame({
-    'values': [1, 2, 2, 3, 3, 3, 4, 4, 5]
-})
+
 app.layout = html.Div([
     html.H1("Payout Calculator for 1 Year Battery Warranty "),
     html.Label("Price Per kWh"),
     dcc.Input(id='price-per-kwh', type='number', value=576 ),
+
     html.Label("Average Battery Pack Size (kWh)"),
     dcc.Input(id='battery-size-kwh', type='number', value=40),
+
     html.Label("Target Loss Ratio, %"),
     dcc.Input(id='target-loss-ratio', type='number', value=30, min=0, max=100),
-    html.H1(""),
+
     dcc.Graph(id='histogram'),
+
     html.Div(id='result-text'),
     html.P("Battery replacements modeled off Recurrent auto's 15,000 EVs users. Link below."),
     html.A("Recurrent Auto: How Long Do Electric Car Batteries Last?", href="https://www.recurrentauto.com/research/how-long-do-ev-batteries-last"),
@@ -34,18 +36,18 @@ app.layout = html.Div([
 # Create a callback function
 @app.callback(
     [Output('histogram', 'figure'),
-     Output('result-text', 'children')],
+     Output('result-text', 'children'),],
     [Input('price-per-kwh', 'value'),
      Input('battery-size-kwh', 'value'),
-     Input('target-loss-ratio', 'value')]
+     Input('target-loss-ratio', 'value'),],
 )
 def update_results( price_per_kwh, battery_size_kwh, target_loss_ratio ):
     # Perform your calculations here
     # make target loss ratio into a percent
     target_loss_ratio=target_loss_ratio/100
-    # df_by_year = pd.read_csv("/Users/dianaransomhall/Dropbox/Documents/Software/batteryze/batteryze_app/data/df_by_year_unformatted.csv")
-    github_csv_url = "https://raw.githubusercontent.com/dianaransomhall/render_feasibility_study/main/data/df_by_year_unformatted.csv"
-    df_by_year = pd.read_csv(github_csv_url)
+    df_by_year = pd.read_csv("/Users/dianaransomhall/Dropbox/Documents/Software/batteryze/batteryze_app/data/df_by_year_unformatted.csv")
+    # github_csv_url = "https://raw.githubusercontent.com/dianaransomhall/render_feasibility_study/main/data/df_by_year_unformatted.csv"
+    # df_by_year = pd.read_csv(github_csv_url)
     def calculate_payout(df_by_year,
                          price_per_kwh=576,
                          battery_size_kwh=40,
@@ -79,7 +81,7 @@ def update_results( price_per_kwh, battery_size_kwh, target_loss_ratio ):
             df_by_year["payout_per_kwh_1yr"] = a
             df_by_year["insurance_payout_total"] = battery_size_kwh * df_by_year["payout_per_kwh_1yr"]
             # Target Loss ratio
-            df_by_year["premiums_collected_total"]= df_by_year["insurance_payout_total"]/target_loss_ratio
+            df_by_year["premiums_collected_total"]= df_by_year["insurance_payout_total"]*target_loss_ratio
             df_by_year["premium_price"]= df_by_year["premiums_collected_total"]/ df_by_year["vehicle_ca_added"]
         else:
             for i in range(0, len(df_by_year) - warranty_period):
@@ -122,15 +124,44 @@ def update_results( price_per_kwh, battery_size_kwh, target_loss_ratio ):
     # create figure
     # histogram_figure = px.bar(df_by_year, x='premiums_collected_total',
     #                           y='year', orientation='h', title='Premiums Collected by Year')
-    histogram_figure = px.bar(df_by_year, x='insurance_payout_total',
-                              y='year', orientation='h', title='Insurance Payout')
-    histogram_figure.update_xaxes(tickformat="$,.2f",title_text="Total Payout ($)")  # Format the x-axis labels as currency
-    histogram_figure.update_yaxes(title_text="Year")
-    histogram_figure.update_layout(
-        title_text='Total Paid Out By Insurance Yearly',
-        title_x=0.5,  # Center the title
-        title_font_size=24  # Adjust the font size
-    )
+    def make_histogram_premium(df_by_year, target_loss_ratio):
+        histogram_figure_premium = px.bar(df_by_year, x='premium_price',
+                                  y='year', orientation='h',
+                                          title=f'Premiums Price Set to {target_loss_ratio}% Target Loss Ratio' )
+
+        histogram_figure_premium.update_xaxes(tickformat="$,.2f",
+                                             title_text="Premium ($)")  # Format the x-axis labels as currency
+        histogram_figure_premium.update_yaxes(title_text="Year")
+        # df_by_year['perc_EV_replacements'] = [value + '%' for value in df_by_year['perc_EV_replacements']]
+        df_by_year['perc_EV_replacements_str'] = [f'{value:.1f}%' for value in df_by_year['perc_EV_replacements']]
+        histogram_figure_premium.update_traces(textposition='inside',
+                                               text=df_by_year['perc_EV_replacements_str'] )
+
+
+        histogram_figure_premium.update_xaxes(tickformat="$,.2f", title_text="Premium ($)")
+        histogram_figure_premium.update_yaxes(title_text="Year")
+        histogram_figure_premium.update_layout(
+            title_text=f'Premiums Price from {round(target_loss_ratio*100)}% Target Loss Ratio<br> % Bat Replacement in Bar',
+            title_x=0.5,
+            title_font_size=24
+        )
+
+        return histogram_figure_premium
+
+    def make_histogram_payout(df_by_year):
+        histogram_figure_payout = px.bar(df_by_year, x='insurance_payout_total',
+                                  y='year', orientation='h', title='Insurance Payout')
+        histogram_figure_payout.update_xaxes(tickformat="$,.2f",title_text="Total Payout ($)")  # Format the x-axis labels as currency
+        histogram_figure_payout.update_yaxes(title_text="Year")
+        histogram_figure_payout.update_layout(
+            title_text='Total Paid Out By Insurance Yearly',
+            title_x=0.5,  # Center the title
+            title_font_size=24  # Adjust the font size
+        )
+        return histogram_figure_payout
+
+    histogram_figure_premium = make_histogram_premium(df_by_year,target_loss_ratio=target_loss_ratio)
+    histogram_figure_payout = make_histogram_payout(df_by_year)
     # format data
     def format_data(df_by_year):
         column_mapping = {'perc_EV_replacements': "Bats Replaced %",
@@ -187,9 +218,11 @@ def update_results( price_per_kwh, battery_size_kwh, target_loss_ratio ):
         and warranty initiated in year listed for EVs. Calculations use a rate of battery replacement \n
         that changes between 0.6%-11.2% depending on the year. \n
         ## Calculations
-        * Premium:  
+        * Premium Total:  
           Given a desired loss-ratio, the premium price is calculated as a function of yearly losses.
-        For example, if 20% is the target loss-ratio: Premium $ = Insurance Payout Total / .2. 
+        For example, if 20% is the target loss-ratio then total premiums = Insurance Payout Total / .2. 
+        * Premium Price:
+        Premium price is total premiums / outstanding warranties.
         * Insurance Payout :
                      The calculation of Insurance Payout is as follows: 
         Insurance Payout Total = Insurance Payout /kWh * Price of Bat Replacement \/kWh \* Ave. Bat Size (kWh)
@@ -213,7 +246,7 @@ def update_results( price_per_kwh, battery_size_kwh, target_loss_ratio ):
     ]
 
 
-    return histogram_figure, result_text
+    return histogram_figure_premium, result_text
 
 
 # Run the app
